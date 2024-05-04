@@ -1,0 +1,55 @@
+---
+title: "cjs_webr"
+format: html
+engine: knitr
+webr:
+  packages: ['ggplot2', 'marked', 'dplyr', 'tidyr']
+filters:
+  - webr
+---
+
+## Hidden Markov Models for Mark-Recapture Data: The Cormack-Jolly-Seber Model
+
+In this assignment you will be interactively learning about hidden markov models (HMMs) and how to fit a special case of one using R. Here I assume you are familiar with the basic idea of mark-recapture data (we will have gone over it in class, see lecture slides if you need to refresh your memory).
+
+The first task is to load the R package we will need to use for this assignment:
+
+```{webr-r}
+library(marked)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+The first thing we need before we get started on HMM models is some data. We will begin with some data that is included in the `marked` package called `dipper`
+
+```{webr-r}
+data(dipper)
+head(dipper)
+```
+
+The `ch` variable stands for 'capture history', and it is coded as a simple string of zeroes and ones. This is not a particularly good format form a data science perspective, but this is what the `marked` package takes (surprisingly). Nevertheless we will convert it to a more standard Rish format, which will give you a better sense of how data should be arranged for maximum portability. Then we can use the data with other R packages later as well. We will use the `dplyr` and `tidyr` packages for reformatting the data.
+
+If you have forgotten some
+
+```{webr-r}
+dipper2 <- dipper |>
+  separate_wider_position(ch, 
+                          widths = c(t1 = 1, t2 = 1, t3 = 1, 
+                                     t4 = 1, t5 = 1, t6 = 1,
+                                     t7 = 1)) |>
+  mutate(id = 1:n()) |>
+  pivot_longer(starts_with("t"), names_to = "time", values_to = "captured")
+
+dipper2
+```
+
+`dipper2` is now in so-called 'long' format. This is a very general 'tidy' format for data that keeps each column as one type of data (e.g. all time identifiers are in one column, and the data of interest is in one column as well: `captured`). It is easy to get data back into so-called 'wide' format using `tidyr::pivot_wider()`.
+
+This is a webR-enabled code cell in a Quarto HTML document.
+
+```{webr-r}
+fit = lm(mpg ~ am, data = mtcars)
+
+summary(fit)
+```

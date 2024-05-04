@@ -1,0 +1,154 @@
+---
+title: "Cormack-Jolly-Seber Model"
+format: html
+engine: knitr
+webr:
+  packages: ['ggplot2', 'marked', 'dplyr', 'tidyr']
+filters:
+  - webr
+---
+
+## Load Packages
+
+```{webr-r}
+library(marked)
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+```
+
+## Mark-Recapture Simulation
+
+```{webr-r}
+n_marked <- 100
+pop_size <- 1000
+n_captures <- 20
+
+animals <- integer(pop_size)
+animals[sample.int(pop_size, n_marked)] <- 1:n_marked
+
+p_survive <- 0.9
+p_capture <- 0.5
+
+capture_history <- list()
+
+for(i in 1:n_captures) {
+  
+  survived <- rbinom(length(animals), 1, prob = p_survive)
+  animals <- animals[survived == 1]
+  
+  captured <- rbinom(length(animals), 1, prob = p_capture)
+  animals_captured <- animals[captured == 1]
+  
+  capture_history[[i]] <- animals_captured
+  
+}
+
+capture_history
+```
+
+## Data Mungeing
+
+```{webr-r}
+tabulate(capture_history[[1]], nbins = 100)
+capture_matrix <- sapply(capture_history, tabulate, nbins = 100)
+image(1:20, 1:100, t(capture_matrix), xlab = "Capture Time", ylab = "Animal")
+```
+
+## Looking for Patterns
+
+```{webr-r}
+simulate_capture_history <- function(p_survive,
+                                     p_capture,
+                                     pop_size = 1000,
+                                     n_marked = 100,
+                                     n_captures = 20) {
+  
+  animals <- integer(pop_size)
+  animals[sample.int(pop_size, n_marked)] <- 1:n_marked
+  capture_history <- list()
+
+  for(i in 1:n_captures) {
+    
+    survived <- rbinom(length(animals), 1, prob = p_survive)
+    animals <- animals[survived == 1]
+    
+    captured <- rbinom(length(animals), 1, prob = p_capture)
+    animals_captured <- animals[captured == 1]
+    
+    capture_history[[i]] <- animals_captured
+    
+  }
+  
+  tabulate(capture_history[[1]], nbins = 100)
+  capture_matrix <- sapply(capture_history, tabulate, nbins = 100)
+  image(1:20, 1:100, t(capture_matrix), xlab = "Capture Time", ylab = "Animal")
+  
+  capture_matrix
+}
+```
+
+Make a grid and run it:
+
+```{webr-r}
+param_grid <- expand.grid(p_survive = seq(0.5, 0.99, length.out = 5),
+                          p_capture = seq(0.1, 0.99, length.out = 5))
+
+old_par <- par(mfrow = c(5, 5),
+               mar=c(1,1,1,1))
+
+cps <- lapply(1:nrow(param_grid), 
+              function(x) simulate_capture_history(param_grid[x, 1], 
+                                                   param_grid[x, 2]))
+
+
+```
+
+## Likelihood Calculation
+
+```{webr-r}
+S <- matrix(c(p_survive, 0, 1 - p_survive, 1), nrow = 2)
+C_0 <- matrix(c(1 - p_capture, 0, 0, 1), nrow = 2)
+C_1 <- matrix(c(p_capture, 0, 0, 0), nrow = 2)
+
+init <- matrix(c(1, 0), nrow = 1)
+
+## Likelihood of 100
+
+p1 <- init
+p1
+p2 <- p1 %*% S %*% C_0
+p2
+p3 <- p2 %*% S %*% C_0
+p3
+
+L <- sum(p3)
+L
+
+## Likelihood of 101
+p2 <- p1 %*% S %*% C_0
+p2
+p3 <- p2 %*% S %*% C_1
+p3
+
+L <- sum(p3)
+L
+
+```
+
+## Fitting Basic Model with {marked}
+
+Note that in the following Phi is equivalent to S (e.g. survival or hidden state transition matrix), and p is equivalent to C (consitional capture probabilities).
+
+```{webr-r}
+capture_matrix <- cbind(matrix(1, ncol = 1, nrow = 100), capture_matrix)
+dat <- tibble(ch = apply(capture_matrix, 1, function(x) paste(x, collapse = "")))
+
+res <- crm(dat, model = "hmmCJS",
+           model.parameters = list(Phi = list(formula = ~1),
+                                   p = list(formula = ~1)))
+
+res
+
+res$results$reals
+```
